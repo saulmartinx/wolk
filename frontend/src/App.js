@@ -12,7 +12,7 @@ const PiCoinIcon = ({ size = 20 }) => (
 );
 
 // Job Card Component
-const JobCard = ({ job, onSwipe, isTop }) => {
+const JobCard = ({ job, onSwipe, onPayment, isTop, piUser }) => {
   const [dragStart, setDragStart] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -35,7 +35,12 @@ const JobCard = ({ job, onSwipe, isTop }) => {
     
     const threshold = 100;
     if (Math.abs(dragOffset.x) > threshold) {
-      onSwipe(job.id, dragOffset.x > 0 ? 'accept' : 'reject');
+      const action = dragOffset.x > 0 ? 'accept' : 'reject';
+      if (action === 'accept' && piUser) {
+        onPayment(job);
+      } else {
+        onSwipe(job.id, action);
+      }
     }
     
     setDragStart(null);
@@ -84,7 +89,7 @@ const JobCard = ({ job, onSwipe, isTop }) => {
       
       {/* Swipe indicators */}
       <div className={`swipe-indicator accept ${dragOffset.x > 50 ? 'active' : ''}`}>
-        ✓ ACCEPT
+        ✓ ACCEPT & PAY
       </div>
       <div className={`swipe-indicator reject ${dragOffset.x < -50 ? 'active' : ''}`}>
         ✗ REJECT
@@ -101,11 +106,144 @@ function App() {
   const [message, setMessage] = useState('');
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [piUser, setPiUser] = useState(null);
+  const [piInitialized, setPiInitialized] = useState(false);
 
   useEffect(() => {
+    initializePi();
     fetchJobs();
     fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    if (selectedCategory) {
+      fetchJobs();
+    }
   }, [selectedCategory]);
+
+  const initializePi = () => {
+    if (window.Pi) {
+      window.Pi.init({ 
+        version: "2.0", 
+        sandbox: true // Use testnet for development
+      });
+      setPiInitialized(true);
+      console.log("✅ Pi SDK initialized");
+    } else {
+      console.warn("⚠️ Pi SDK not loaded");
+      // For development, we'll continue without Pi SDK
+      setPiInitialized(false);
+    }
+  };
+
+  const authenticatePiUser = async () => {
+    if (!window.Pi || !piInitialized) {
+      setMessage("Pi SDK not available. Using demo mode.");
+      return;
+    }
+
+    try {
+      const scopes = ['username', 'payments'];
+      
+      const onIncompletePayment = async (payment) => {
+        console.log("Handling incomplete payment:", payment);
+        try {
+          await fetch(`${API_URL}/api/payments/incomplete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payment)
+          });
+        } catch (error) {
+          console.error("Error handling incomplete payment:", error);
+        }
+      };
+
+      const authResult = await window.Pi.authenticate(scopes, onIncompletePayment);
+      
+      // Send authentication data to backend
+      await fetch(`${API_URL}/api/pi/auth`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(authResult.user)
+      });
+
+      setPiUser(authResult.user);
+      setMessage(`Welcome to Wolk, ${authResult.user.username}! 🎉`);
+      
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Pi authentication failed:', error);
+      setMessage('Authentication failed. Using demo mode.');
+    }
+  };
+
+  const initiatePayment = async (job) => {
+    if (!window.Pi || !piUser) {
+      setMessage("Pi payment not available. Using demo mode.");
+      setTimeout(() => setMessage(''), 3000);
+      handleSwipe(job.id, 'accept');
+      return;
+    }
+
+    try {
+      const paymentData = {
+        amount: job.payment,
+        memo: `Payment for ${job.title} on Wolk`,
+        metadata: { 
+          jobId: job.id,
+          jobTitle: job.title,
+          employer: job.employer 
+        }
+      };
+
+      const paymentCallbacks = {
+        onReadyForServerApproval: async (paymentId) => {
+          console.log("Payment ready for approval:", paymentId);
+          try {
+            await fetch(`${API_URL}/api/payments/approve`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ paymentId })
+            });
+          } catch (error) {
+            console.error("Payment approval failed:", error);
+          }
+        },
+        onReadyForServerCompletion: async (paymentId, txid) => {
+          console.log("Payment ready for completion:", paymentId, txid);
+          try {
+            const response = await fetch(`${API_URL}/api/payments/complete`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ paymentId, txid })
+            });
+            
+            const result = await response.json();
+            setMessage(`🎉 Payment completed! ${result.amount} Pi sent to ${job.employer}`);
+            setCurrentJobIndex(prevIndex => prevIndex + 1);
+          } catch (error) {
+            console.error("Payment completion failed:", error);
+            setMessage("Payment processing error. Please try again.");
+          }
+        },
+        onCancel: () => {
+          setMessage("Payment cancelled");
+          setTimeout(() => setMessage(''), 3000);
+        },
+        onError: (error) => {
+          console.error("Payment error:", error);
+          setMessage("Payment error. Please try again.");
+          setTimeout(() => setMessage(''), 3000);
+        }
+      };
+
+      await window.Pi.createPayment(paymentData, paymentCallbacks);
+    } catch (error) {
+      console.error('Payment initiation failed:', error);
+      setMessage('Payment failed. Please try again.');
+      setTimeout(() => setMessage(''), 3000);
+    }
+  };
 
   const fetchJobs = async () => {
     try {
@@ -142,7 +280,7 @@ function App() {
         },
         body: JSON.stringify({
           job_id: jobId,
-          user_id: 'demo_user',
+          user_id: piUser?.uid || 'demo_user',
           action: action
         })
       });
@@ -163,7 +301,12 @@ function App() {
 
   const handleButtonAction = (action) => {
     if (currentJobIndex < jobs.length) {
-      handleSwipe(jobs[currentJobIndex].id, action);
+      const currentJob = jobs[currentJobIndex];
+      if (action === 'accept' && piUser) {
+        initiatePayment(currentJob);
+      } else {
+        handleSwipe(currentJob.id, action);
+      }
     }
   };
 
@@ -175,7 +318,7 @@ function App() {
       <div className="app loading">
         <div className="loading-spinner">
           <PiCoinIcon size={48} />
-          <p>Loading jobs...</p>
+          <p>Loading Wolk jobs...</p>
         </div>
       </div>
     );
@@ -187,7 +330,7 @@ function App() {
       <header className="app-header">
         <div className="logo">
           <PiCoinIcon size={32} />
-          <span>Pi Work</span>
+          <span>Wolk</span>
         </div>
         
         <select 
@@ -200,8 +343,23 @@ function App() {
           ))}
         </select>
         
-        <button className="profile-btn">👤</button>
+        <button 
+          className="profile-btn" 
+          onClick={piUser ? () => setMessage(`Logged in as ${piUser.username}`) : authenticatePiUser}
+        >
+          {piUser ? piUser.username[0].toUpperCase() : '🔐'}
+        </button>
       </header>
+
+      {/* Pi Authentication Banner */}
+      {!piUser && (
+        <div className="auth-banner">
+          <p>Connect your Pi wallet to make real payments!</p>
+          <button onClick={authenticatePiUser} className="auth-btn">
+            Connect Pi Wallet
+          </button>
+        </div>
+      )}
 
       {/* Message */}
       {message && (
@@ -227,14 +385,18 @@ function App() {
               <JobCard
                 job={nextJob}
                 onSwipe={handleSwipe}
+                onPayment={initiatePayment}
                 isTop={false}
+                piUser={piUser}
               />
             )}
             {currentJob && (
               <JobCard
                 job={currentJob}
                 onSwipe={handleSwipe}
+                onPayment={initiatePayment}
                 isTop={true}
+                piUser={piUser}
               />
             )}
           </>
@@ -254,7 +416,7 @@ function App() {
             className="accept-btn"
             onClick={() => handleButtonAction('accept')}
           >
-            ✓ Accept
+            {piUser ? '✓ Accept & Pay' : '✓ Accept'}
           </button>
         </div>
       )}

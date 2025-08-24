@@ -59,9 +59,10 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: bold;
   color: #333;
+  letter-spacing: -1px;
 }
 
 .category-filter {
@@ -80,18 +81,49 @@ body {
 }
 
 .profile-btn {
-  background: #f0f0f0;
+  background: #4CAF50;
+  color: white;
   border: none;
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  font-size: 18px;
+  font-size: 14px;
+  font-weight: bold;
   cursor: pointer;
   transition: background 0.2s;
 }
 
 .profile-btn:hover {
-  background: #e0e0e0;
+  background: #45a049;
+}
+
+/* Pi Authentication Banner */
+.auth-banner {
+  background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%);
+  color: #333;
+  padding: 12px 20px;
+  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.auth-btn {
+  background: #333;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.auth-btn:hover {
+  background: #555;
 }
 
 /* Message */
@@ -212,7 +244,7 @@ body {
   padding: 12px 16px;
   border-radius: 12px;
   margin-bottom: 16px;
-  border: 1px solid #FFE0B2;
+  border: 2px solid #FFC107;
 }
 
 .job-payment span {
@@ -251,10 +283,10 @@ body {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  padding: 8px 16px;
+  padding: 12px 20px;
   border-radius: 8px;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 16px;
   opacity: 0;
   transition: opacity 0.2s ease;
   pointer-events: none;
@@ -287,28 +319,29 @@ body {
 }
 
 .action-buttons button {
-  width: 60px;
   height: 60px;
   border: none;
-  border-radius: 50%;
-  font-size: 24px;
+  border-radius: 30px;
+  font-size: 16px;
   font-weight: bold;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .reject-btn {
+  width: 120px;
   background: #f44336;
   color: white;
 }
 
 .accept-btn {
+  width: 140px;
   background: #4CAF50;
   color: white;
 }
 
 .action-buttons button:hover {
-  transform: scale(1.1);
+  transform: scale(1.05);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
@@ -372,9 +405,16 @@ body {
   }
   
   .action-buttons button {
-    width: 50px;
     height: 50px;
-    font-size: 20px;
+    font-size: 14px;
+  }
+  
+  .reject-btn {
+    width: 100px;
+  }
+  
+  .accept-btn {
+    width: 120px;
   }
 }
 
@@ -392,4 +432,12 @@ body {
 
 .job-card {
   animation: cardEntry 0.3s ease-out;
+}
+
+/* Pi Network Branding */
+.logo {
+  background: linear-gradient(45deg, #FFC107, #FF9800);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }

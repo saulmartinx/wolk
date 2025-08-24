@@ -1,14 +1,16 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import os
 from motor.motor_asyncio import AsyncIOMotorClient
 import uuid
 from datetime import datetime
+import requests
+import json
 
-app = FastAPI(title="Pi Work API", version="1.0.0")
+app = FastAPI(title="Wolk API", version="1.0.0")
 
 # CORS middleware
 app.add_middleware(
@@ -22,9 +24,15 @@ app.add_middleware(
 # MongoDB connection
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 client = AsyncIOMotorClient(MONGO_URL)
-db = client.piwork_db
+db = client.wolk_db
 jobs_collection = db.jobs
 users_collection = db.users
+transactions_collection = db.transactions
+
+# Pi Network Configuration
+PI_API_KEY = os.environ.get('PI_API_KEY')
+PI_APP_ID = os.environ.get('PI_APP_ID')
+PI_WALLET_KEY = os.environ.get('PI_WALLET_KEY')
 
 # Pydantic models
 class Job(BaseModel):
@@ -40,20 +48,44 @@ class Job(BaseModel):
     deadline: str
     created_at: str
 
-class User(BaseModel):
-    id: str
-    name: str
-    email: str
-    profile_image: str
-    rating: float
-    jobs_completed: int
+class PiUser(BaseModel):
+    uid: str
+    username: str
+    access_token: str
+
+class PiPayment(BaseModel):
+    amount: float
+    memo: str
+    metadata: Dict[str, Any]
+
+class PaymentApproval(BaseModel):
+    paymentId: str
+
+class PaymentCompletion(BaseModel):
+    paymentId: str
+    txid: str
 
 class SwipeAction(BaseModel):
     job_id: str
     user_id: str
     action: str  # "accept" or "reject"
 
-# Sample job data
+# Pi API verification
+def verify_pi_payment(payment_id: str):
+    """Verify payment with Pi Network servers"""
+    try:
+        url = f"https://api.minepi.com/v2/payments/{payment_id}"
+        headers = {"Authorization": f"Key {PI_API_KEY}"}
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code == 200:
+            return response.json()
+        return None
+    except Exception as e:
+        print(f"Error verifying payment: {e}")
+        return None
+
+# Sample job data with Wolk branding
 sample_jobs = [
     {
         "id": str(uuid.uuid4()),
@@ -128,11 +160,135 @@ async def startup_event():
     existing_jobs = await jobs_collection.count_documents({})
     if existing_jobs == 0:
         await jobs_collection.insert_many(sample_jobs)
-        print("✅ Sample jobs inserted into database")
+        print("✅ Sample jobs inserted into Wolk database")
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "service": "Pi Work API"}
+    return {"status": "healthy", "service": "Wolk API", "pi_integration": "enabled"}
+
+@app.post("/api/pi/auth")
+async def authenticate_pi_user(user: PiUser):
+    """Store Pi user authentication data"""
+    try:
+        # Store user in database
+        user_data = {
+            "pi_uid": user.uid,
+            "username": user.username,
+            "access_token": user.access_token,
+            "created_at": datetime.now().isoformat(),
+            "last_login": datetime.now().isoformat()
+        }
+        
+        # Update or insert user
+        await users_collection.update_one(
+            {"pi_uid": user.uid},
+            {"$set": user_data},
+            upsert=True
+        )
+        
+        print(f"✅ Pi user authenticated: {user.username}")
+        return {"status": "success", "message": "User authenticated successfully"}
+    
+    except Exception as e:
+        print(f"❌ Error authenticating user: {e}")
+        raise HTTPException(status_code=500, detail="Authentication failed")
+
+@app.post("/api/payments/approve")
+async def approve_payment(approval: PaymentApproval):
+    """Approve payment with Pi Network"""
+    try:
+        url = "https://api.minepi.com/v2/payments/approve"
+        headers = {
+            "Authorization": f"Key {PI_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {"paymentId": approval.paymentId}
+        response = requests.post(url, json=data, headers=headers)
+        
+        if response.status_code == 200:
+            # Store pending payment in database
+            payment_record = {
+                "payment_id": approval.paymentId,
+                "status": "approved",
+                "created_at": datetime.now().isoformat()
+            }
+            await transactions_collection.insert_one(payment_record)
+            
+            print(f"✅ Payment approved: {approval.paymentId}")
+            return {"status": "success", "message": "Payment approved"}
+        else:
+            print(f"❌ Payment approval failed: {response.text}")
+            raise HTTPException(status_code=400, detail="Payment approval failed")
+    
+    except Exception as e:
+        print(f"❌ Error approving payment: {e}")
+        raise HTTPException(status_code=500, detail="Payment approval error")
+
+@app.post("/api/payments/complete")
+async def complete_payment(completion: PaymentCompletion):
+    """Complete payment verification"""
+    try:
+        # Verify payment with Pi Network
+        payment_data = verify_pi_payment(completion.paymentId)
+        
+        if not payment_data:
+            raise HTTPException(status_code=400, detail="Payment verification failed")
+        
+        # Update transaction in database
+        transaction_update = {
+            "payment_id": completion.paymentId,
+            "txid": completion.txid,
+            "amount": payment_data.get("amount", 0),
+            "status": "completed",
+            "completed_at": datetime.now().isoformat(),
+            "pi_data": payment_data
+        }
+        
+        await transactions_collection.update_one(
+            {"payment_id": completion.paymentId},
+            {"$set": transaction_update},
+            upsert=True
+        )
+        
+        print(f"✅ Payment completed: {completion.paymentId}")
+        return {
+            "status": "success", 
+            "message": "Payment completed successfully",
+            "txid": completion.txid,
+            "amount": payment_data.get("amount", 0)
+        }
+    
+    except Exception as e:
+        print(f"❌ Error completing payment: {e}")
+        raise HTTPException(status_code=500, detail="Payment completion error")
+
+@app.post("/api/payments/incomplete")
+async def handle_incomplete_payment(payment_data: dict):
+    """Handle incomplete payments during authentication"""
+    try:
+        payment_id = payment_data.get("identifier")
+        
+        # Check if payment exists and is completed
+        existing = await transactions_collection.find_one({"payment_id": payment_id})
+        
+        if existing and existing.get("status") == "completed":
+            return {"action": "ignore", "message": "Payment already completed"}
+        
+        # If payment is still pending, try to complete it
+        if payment_data.get("status") == "pending":
+            txid = payment_data.get("transaction", {}).get("txid")
+            if txid:
+                completion = PaymentCompletion(paymentId=payment_id, txid=txid)
+                await complete_payment(completion)
+                return {"action": "completed", "message": "Payment completed"}
+        
+        print(f"📋 Handled incomplete payment: {payment_id}")
+        return {"action": "processed", "message": "Payment processed"}
+    
+    except Exception as e:
+        print(f"❌ Error handling incomplete payment: {e}")
+        return {"action": "error", "message": str(e)}
 
 @app.get("/api/jobs", response_model=List[Job])
 async def get_jobs(category: Optional[str] = None, limit: int = 10):
@@ -166,8 +322,6 @@ async def get_job(job_id: str):
 @app.post("/api/swipe")
 async def record_swipe(swipe_action: SwipeAction):
     try:
-        # In a real app, this would record the swipe action and handle matching
-        # For now, we'll just return success
         action_record = {
             "id": str(uuid.uuid4()),
             "job_id": swipe_action.job_id,
@@ -176,13 +330,12 @@ async def record_swipe(swipe_action: SwipeAction):
             "timestamp": datetime.now().isoformat()
         }
         
-        # Log the swipe action
-        print(f"📱 Swipe recorded: {swipe_action.action} for job {swipe_action.job_id}")
+        print(f"📱 Wolk swipe recorded: {swipe_action.action} for job {swipe_action.job_id}")
         
         if swipe_action.action == "accept":
-            return {"message": "Job accepted! You'll be notified when employer responds.", "match": True}
+            return {"message": "Job accepted! Ready to initiate Pi payment.", "match": True, "requires_payment": True}
         else:
-            return {"message": "Job rejected", "match": False}
+            return {"message": "Job rejected", "match": False, "requires_payment": False}
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -192,6 +345,20 @@ async def get_categories():
     try:
         categories = await jobs_collection.distinct("category")
         return {"categories": categories}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/transactions")
+async def get_transactions(limit: int = 50):
+    """Get transaction history"""
+    try:
+        transactions_cursor = transactions_collection.find().limit(limit).sort("created_at", -1)
+        transactions = []
+        async for tx in transactions_cursor:
+            tx["_id"] = str(tx["_id"])
+            transactions.append(tx)
+        
+        return {"transactions": transactions}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
