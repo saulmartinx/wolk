@@ -1,5 +1,4 @@
 
--# Here are your Instructions
 +# 🚀 Wolk - The Pi Network Job Marketplace
 +
 +**A decentralized job marketplace with Tinder-like swipe interface, powered by Pi Coin payments**
@@ -37,84 +36,7 @@
 +- **Pi Coin Payments** - Real cryptocurrency transactions
 +- **Smart Contracts** - Automated payment escrow
 +
-+## 🚀 Quick Start
-+
-+### Prerequisites
-+- Node.js 16+ and npm/yarn
-+- Python 3.8+
-+- MongoDB
-+- Pi Network Developer Account
-+
-+### Installation
-+
-+1. **Clone the repository**
-+   ```bash
-+   git clone https://github.com/yourusername/wolk-pi-marketplace.git
-+   cd wolk-pi-marketplace
-+   ```
-+
-+2. **Backend Setup**
-+   ```bash
-+   cd backend
-+   pip install -r requirements.txt
-+   
-+   # Configure environment variables
-+   cp .env.example .env
-+   # Add your Pi Network credentials to .env
-+   ```
-+
-+3. **Frontend Setup**
-+   ```bash
-+   cd frontend
-+   yarn install
-+   # or npm install
-+   ```
-+
-+4. **Database Setup**
-+   ```bash
-+   # Ensure MongoDB is running
-+   mongod
-+   ```
-+
-+5. **Start the Application**
-+   ```bash
-+   # Terminal 1 - Backend
-+   cd backend
-+   python server.py
-+   
-+   # Terminal 2 - Frontend  
-+   cd frontend
-+   yarn start
-+   ```
-+
-+## 🔑 Pi Network Configuration
-+
-+### Getting Pi Network Credentials
-+
-+1. **Install Pi Apps**
-+   - Download Pi Mining App from your app store
-+   - Install Pi Browser
-+
-+2. **Register Your App**
-+   - Open Pi App → Menu → Pi Utilities → Develop
-+   - Click "New App" and fill in details:
-+     - **App Name:** Wolk
-+     - **Description:** Decentralized job marketplace
-+     - **Network:** Pi Testnet (for development)
-+
-+3. **Get Credentials**
-+   - **API Key:** From Developer Portal → API Key section
-+   - **App ID:** Your registered app identifier  
-+   - **Wallet Key:** Generated in App Wallet section
-+
-+4. **Configure Environment**
-+   ```bash
-+   # backend/.env
-+   PI_API_KEY=your_pi_api_key_here
-+   PI_APP_ID=your_app_id_here  
-+   PI_WALLET_KEY=your_wallet_key_here
-+   MONGO_URL=mongodb://localhost:27017
-+   ```
+
 +
 +## 📱 Usage
 +
