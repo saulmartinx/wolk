@@ -110,6 +110,28 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [piUser, setPiUser] = useState(null);
   const [piInitialized, setPiInitialized] = useState(false);
+  const [currentPage, setCurrentPage] = useState('home');
+
+  // Check for URL-based page routing
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.includes('privacy')) {
+      setCurrentPage('privacy');
+    } else if (path.includes('terms')) {
+      setCurrentPage('terms');
+    } else {
+      setCurrentPage('home');
+    }
+  }, []);
+
+  // Render different pages based on currentPage
+  if (currentPage === 'privacy') {
+    return <PrivacyPolicy />;
+  }
+  
+  if (currentPage === 'terms') {
+    return <TermsOfService />;
+  }
 
   useEffect(() => {
     initializePi();
