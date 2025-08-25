@@ -3,7 +3,76 @@ import './App.css';
 import PrivacyPolicy from './PrivacyPolicy';
 import TermsOfService from './TermsOfService';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+// For GitHub Pages deployment, we'll use mock data since we don't have a live backend
+const mockJobs = [
+  {
+    "id": "job-1",
+    "title": "Chop Firewood",
+    "description": "Need someone to chop firewood for winter. Urgently need assistance! Must be physically fit and have experience with axes.",
+    "payment": 50.0,
+    "location": "Tallinn, Estonia",
+    "employer": "John Smith",
+    "employer_rating": 4.8,
+    "category": "Manual Labor",
+    "image_url": "https://images.unsplash.com/photo-1675134768072-d700f38ceef0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njd8MHwxfHNlYXJjaHwzfHx3b3JrJTIwam9ic3xlbnwwfHx8fDE3NTI3NTg2MDF8MA&ixlib=rb-4.1.0&q=85",
+    "deadline": "2025-03-20",
+    "created_at": "2025-03-15"
+  },
+  {
+    "id": "job-2",
+    "title": "Office Cleaning",
+    "description": "Looking for reliable cleaner for small office space. Daily cleaning required, flexible hours available.",
+    "payment": 35.0,
+    "location": "Riga, Latvia",
+    "employer": "Clean Solutions Ltd",
+    "employer_rating": 4.6,
+    "category": "Cleaning",
+    "image_url": "https://images.unsplash.com/photo-1741543821138-471a53f147f2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Njd8MHwxfHNlYXJjaHwyfHx3b3JrJTIwam9ic3xlbnwwfHx8fDE3NTI3NTg2MDF8MA&ixlib=rb-4.1.0&q=85",
+    "deadline": "2025-03-25",
+    "created_at": "2025-03-14"
+  },
+  {
+    "id": "job-3",
+    "title": "Website Development",
+    "description": "Need a simple website for my restaurant. Looking for someone with React and modern web development skills.",
+    "payment": 120.0,
+    "location": "Helsinki, Finland",
+    "employer": "Maria Andersson",
+    "employer_rating": 4.9,
+    "category": "Technology",
+    "image_url": "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwyfHxlbXBsb3ltZW50fGVufDB8fHx8MTc1Mjc1ODYwOXww&ixlib=rb-4.1.0&q=85",
+    "deadline": "2025-03-30",
+    "created_at": "2025-03-13"
+  },
+  {
+    "id": "job-4",
+    "title": "Document Translation",
+    "description": "Need someone to translate business documents from English to Estonian. Must have professional translation experience.",
+    "payment": 80.0,
+    "location": "Tartu, Estonia",
+    "employer": "Baltic Business Corp",
+    "employer_rating": 4.7,
+    "category": "Professional Services",
+    "image_url": "https://images.unsplash.com/photo-1562564055-71e051d33c19?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwxfHxlbXBsb3ltZW50fGVufDB8fHx8MTc1Mjc1ODYwOXww&ixlib=rb-4.1.0&q=85",
+    "deadline": "2025-03-22",
+    "created_at": "2025-03-12"
+  },
+  {
+    "id": "job-5",
+    "title": "Marketing Consultation",
+    "description": "Small startup needs marketing strategy consultation. Looking for someone with digital marketing experience.",
+    "payment": 95.0,
+    "location": "Stockholm, Sweden",
+    "employer": "Nordic Innovations",
+    "employer_rating": 4.5,
+    "category": "Consulting",
+    "image_url": "https://images.unsplash.com/photo-1517048676732-d65bc937f952?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwzfHxlbXBsb3ltZW50fGVufDB8fHx8MTc1Mjc1ODYwOXww&ixlib=rb-4.1.0&q=85",
+    "deadline": "2025-03-28",
+    "created_at": "2025-03-11"
+  }
+];
+
+const mockCategories = ['All', 'Manual Labor', 'Cleaning', 'Technology', 'Professional Services', 'Consulting'];
 
 // Pi Coin Icon Component
 const PiCoinIcon = ({ size = 20 }) => (
@@ -102,11 +171,11 @@ const JobCard = ({ job, onSwipe, onPayment, isTop, piUser }) => {
 
 // Main App Component
 function App() {
-  const [jobs, setJobs] = useState([]);
+  const [jobs, setJobs] = useState(mockJobs);
   const [currentJobIndex, setCurrentJobIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(mockCategories);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [piUser, setPiUser] = useState(null);
   const [piInitialized, setPiInitialized] = useState(false);
@@ -114,7 +183,7 @@ function App() {
 
   // Check for URL-based page routing
   useEffect(() => {
-    const path = window.location.pathname;
+    const path = window.location.hash || window.location.pathname;
     if (path.includes('privacy')) {
       setCurrentPage('privacy');
     } else if (path.includes('terms')) {
@@ -123,6 +192,11 @@ function App() {
       setCurrentPage('home');
     }
   }, []);
+
+  useEffect(() => {
+    initializePi();
+    filterJobs();
+  }, [selectedCategory]);
 
   // Render different pages based on currentPage
   if (currentPage === 'privacy') {
@@ -133,18 +207,6 @@ function App() {
     return <TermsOfService />;
   }
 
-  useEffect(() => {
-    initializePi();
-    fetchJobs();
-    fetchCategories();
-  }, []);
-
-  useEffect(() => {
-    if (selectedCategory) {
-      fetchJobs();
-    }
-  }, [selectedCategory]);
-
   const initializePi = () => {
     if (window.Pi) {
       window.Pi.init({ 
@@ -154,15 +216,15 @@ function App() {
       setPiInitialized(true);
       console.log("✅ Pi SDK initialized");
     } else {
-      console.warn("⚠️ Pi SDK not loaded");
-      // For development, we'll continue without Pi SDK
+      console.warn("⚠️ Pi SDK not loaded - using demo mode");
       setPiInitialized(false);
     }
   };
 
   const authenticatePiUser = async () => {
     if (!window.Pi || !piInitialized) {
-      setMessage("Pi SDK not available. Using demo mode.");
+      setMessage("Pi SDK not available. Demo mode - showing Wolk interface!");
+      setTimeout(() => setMessage(''), 3000);
       return;
     }
 
@@ -171,26 +233,11 @@ function App() {
       
       const onIncompletePayment = async (payment) => {
         console.log("Handling incomplete payment:", payment);
-        try {
-          await fetch(`${API_URL}/api/payments/incomplete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payment)
-          });
-        } catch (error) {
-          console.error("Error handling incomplete payment:", error);
-        }
+        setMessage("Handling incomplete payment...");
+        setTimeout(() => setMessage(''), 3000);
       };
 
       const authResult = await window.Pi.authenticate(scopes, onIncompletePayment);
-      
-      // Send authentication data to backend
-      await fetch(`${API_URL}/api/pi/auth`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(authResult.user)
-      });
-
       setPiUser(authResult.user);
       setMessage(`Welcome to Wolk, ${authResult.user.username}! 🎉`);
       
@@ -198,14 +245,15 @@ function App() {
     } catch (error) {
       console.error('Pi authentication failed:', error);
       setMessage('Authentication failed. Using demo mode.');
+      setTimeout(() => setMessage(''), 3000);
     }
   };
 
   const initiatePayment = async (job) => {
     if (!window.Pi || !piUser) {
-      setMessage("Pi payment not available. Using demo mode.");
+      setMessage("🎉 Demo Payment: Would pay " + job.payment + " Pi Coins to " + job.employer);
       setTimeout(() => setMessage(''), 3000);
-      handleSwipe(job.id, 'accept');
+      setCurrentJobIndex(prevIndex => prevIndex + 1);
       return;
     }
 
@@ -223,32 +271,12 @@ function App() {
       const paymentCallbacks = {
         onReadyForServerApproval: async (paymentId) => {
           console.log("Payment ready for approval:", paymentId);
-          try {
-            await fetch(`${API_URL}/api/payments/approve`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ paymentId })
-            });
-          } catch (error) {
-            console.error("Payment approval failed:", error);
-          }
+          setMessage("Payment being processed...");
         },
         onReadyForServerCompletion: async (paymentId, txid) => {
           console.log("Payment ready for completion:", paymentId, txid);
-          try {
-            const response = await fetch(`${API_URL}/api/payments/complete`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ paymentId, txid })
-            });
-            
-            const result = await response.json();
-            setMessage(`🎉 Payment completed! ${result.amount} Pi sent to ${job.employer}`);
-            setCurrentJobIndex(prevIndex => prevIndex + 1);
-          } catch (error) {
-            console.error("Payment completion failed:", error);
-            setMessage("Payment processing error. Please try again.");
-          }
+          setMessage(`🎉 Payment completed! ${job.payment} Pi sent to ${job.employer}`);
+          setCurrentJobIndex(prevIndex => prevIndex + 1);
         },
         onCancel: () => {
           setMessage("Payment cancelled");
@@ -269,48 +297,24 @@ function App() {
     }
   };
 
-  const fetchJobs = async () => {
-    try {
-      setLoading(true);
-      const categoryParam = selectedCategory === 'All' ? '' : `?category=${selectedCategory}`;
-      const response = await fetch(`${API_URL}/api/jobs${categoryParam}`);
-      const data = await response.json();
-      setJobs(data);
-      setCurrentJobIndex(0);
-    } catch (error) {
-      console.error('Error fetching jobs:', error);
-      setMessage('Error loading jobs. Please try again.');
-    } finally {
-      setLoading(false);
+  const filterJobs = () => {
+    if (selectedCategory === 'All') {
+      setJobs(mockJobs);
+    } else {
+      setJobs(mockJobs.filter(job => job.category === selectedCategory));
     }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/categories`);
-      const data = await response.json();
-      setCategories(['All', ...data.categories]);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
-    }
+    setCurrentJobIndex(0);
   };
 
   const handleSwipe = async (jobId, action) => {
     try {
-      const response = await fetch(`${API_URL}/api/swipe`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          job_id: jobId,
-          user_id: piUser?.uid || 'demo_user',
-          action: action
-        })
-      });
+      console.log(`Swipe recorded: ${action} for job ${jobId}`);
       
-      const result = await response.json();
-      setMessage(result.message);
+      if (action === 'accept') {
+        setMessage("Job accepted! In production, this would initiate Pi payment.");
+      } else {
+        setMessage("Job rejected");
+      }
       
       // Move to next job
       setCurrentJobIndex(prevIndex => prevIndex + 1);
@@ -328,6 +332,10 @@ function App() {
       const currentJob = jobs[currentJobIndex];
       if (action === 'accept' && piUser) {
         initiatePayment(currentJob);
+      } else if (action === 'accept') {
+        setMessage(`Demo: Would pay ${currentJob.payment} Pi Coins for "${currentJob.title}"`);
+        setTimeout(() => setMessage(''), 3000);
+        setCurrentJobIndex(prevIndex => prevIndex + 1);
       } else {
         handleSwipe(currentJob.id, action);
       }
@@ -399,7 +407,7 @@ function App() {
             <PiCoinIcon size={64} />
             <h3>No more jobs available</h3>
             <p>Check back later for new opportunities!</p>
-            <button onClick={fetchJobs} className="refresh-btn">
+            <button onClick={filterJobs} className="refresh-btn">
               Refresh Jobs
             </button>
           </div>
@@ -444,6 +452,17 @@ function App() {
           </button>
         </div>
       )}
+
+      {/* Footer Links */}
+      <footer className="app-footer">
+        <div className="footer-links">
+          <button onClick={() => setCurrentPage('privacy')} className="footer-link">Privacy Policy</button>
+          <span>•</span>
+          <button onClick={() => setCurrentPage('terms')} className="footer-link">Terms of Service</button>
+          <span>•</span>
+          <a href="https://github.com/saulmartinx/wolk" target="_blank" rel="noopener noreferrer" className="footer-link">GitHub</a>
+        </div>
+      </footer>
     </div>
   );
 }
